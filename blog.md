@@ -6,37 +6,125 @@ Integrating LLM-based functionality into enterprise software has become more acc
 
 As part of SAP's Business AI Strategy, we recognize the vast potential for building customer-specific use cases. With the extensive suite of services available on the BTP, developers are empowered to create their own pro-code automations, business logic, and even sophisticated multi-agent systems. This enables them to leverage the power of Generative AI to address domain-specific business challenges and processes. One of the key offerings in this space is the Generative AI Hub, which provides access to a wide range of foundation models, including multimodal ones, from providers such as OpenAI, Anthropic, and others.
 
-When developing business apps involving LLM's everybody comes to the point, where the first MVP is there and you start to collect feedback from the stakeholders. They demand certain answers to be different and off you go - enaging in improving the system by doing prompt engineering - adding data or adjusting parameters. But at a certain point in time - making changes to fit case 1 - will lead to a regression in case 2. At this point - it gets harder to make proper decisions on how to tweak the system moving forward. In this case it is advised to introduce benchmarks. Benchmarks are techniques to test your version of the AI-system with a set of examples and measure the output based on various approaches. 
+When developing business applications involving LLMs, every team eventually reaches the point where the first MVP is ready, and feedback from stakeholders starts rolling in. Stakeholders often request that certain answers be adjusted, and naturally, you begin refining the system — whether through prompt engineering, adding data, or tweaking parameters.
+
+However, as you address specific cases — optimizing for case 1, for example — you’ll often encounter unintended regressions in case 2. At this stage, making effective decisions about further adjustments becomes increasingly difficult.
+
+This is where introducing benchmarks becomes essential. Benchmarks provide a structured way to evaluate your AI system using a predefined set of examples, allowing you to measure performance consistently across different scenarios and guide future improvements more systematically.
 
 The challenge:
 
-The primary challenge with LLM-based systems lies in their inherent non-deterministic nature. Due to the way LLMs function, even identical or nearly identical inputs can produce varying outputs. 
-Same when executing the same propmt but in different contexts. This behavior stems from the architecture of LLMs, which relies on sampling tokens from a probability distribution, introducing an element of randomness into their responses.
+The primary challenge with LLM-based systems lies in their inherent non-deterministic nature. Because of the way large language models operate, even identical — or nearly identical — inputs can result in different outputs. The same applies when executing the same prompt in varying contexts.
 
-Let's look at 3 relevant patterns of LLM's Evals:
+This variability is rooted in the architecture of LLMs, which sample tokens from a probability distribution, introducing an element of randomness into their responses.
 
-## 1. Evaluate Generated Text
-
-Typical Use-Casese:
-Writing-Assistants: Use Cases focused on enhanced writing for example - Goal Generation in SAP Successfactors
-Copilots: Use-Cases involving text generated to be presented to the user:
-Retrival-Augmented-Generation Systems: Knowledge base integrations to LLM's
+Let’s explore three relevant patterns in evaluating LLMs:
 
 
-Overview:
-This paradigm focuses on the quality of free-form, unstructured outputs (e.g., paragraphs, dialogues, creative writing). Here, the goal is to determine whether the generated text is coherent, contextually relevant, factually accurate, and stylistically appropriate.
+## 1. Evaluate Structured Data Generation
+
+This area covers use cases where the output follows a predictable, structured format rather than open-ended text. Common examples include classifying emails into categories, extracting key information from documents, generating machine-readable formats like JSON or XML, or creating structured representations such as graphs or tables from text prompts. These scenarios are especially useful when integrating LLMs into automated workflows or downstream systems that rely on consistent, structured data.
+
+This is the simplest pattern to evaluate. You can start by collecting a representative set of examples — for instance, 30 emails — and manually label them with the expected categories. Similar to classical classification tasks, you can then calculate performance metrics such as accuracy and recall. Whenever possible, applying these kinds of numeric metrics provides a clear, objective indicator of your system’s performance.
+
+For categorical outputs — like email classes — an exact match evaluation is usually the most straightforward approach, allowing you to compute overall accuracy across the benchmark set.
+
+For numeric outputs, you can rely on traditional deviation-based metrics, such as mean squared error (MSE), to quantify performance.
+
+In cases involving structured outputs (e.g., JSON, XML), rule-based evaluators can also be useful — for example, to check whether the generated output adheres to the expected format. A basic but critical check might simply verify: Is the output valid JSON? Yes or No.
+
+Let’s take a closer look at the email classification example:
+
+
+```python
+def classify_mail(mail_content):
+    """ Classifies an email into predefined categories using a language model. """
+    # Pseudo code for LLM-based classification
+    categories = ["Business", "Personal", "Spam", "Support", "Sales"]
+    prompt = f"""
+    You are an email classification assistant. 
+    Classify the following email into one or more of the following categories: {categories}.
+    Email content: 
+    {mail_content}
+    """ 
+
+    # Define the JSON schema for the structured output
+    schema = {
+        "type": "object",
+        "properties": {
+            "category": {
+                "type": "string",
+                "enum": ["Business", "Personal", "Spam", "Support", "Sales"]
+            }
+        },
+        "required": ["category"]
+    }
+
+    # Validate the output against the schema
+    result = llm(prompt, variables={"categories": categories, "mail_content": mail_content}, json_schema=schema)  # returning structured output
+
+    return result
+
+# Example usage
+email = "Hi, I would like to inquire about the pricing for your enterprise solutions."
+classification_result = classify_mail(email)
+print(classification_result)
+```
+Our classify_mail function generates a structured output, including a category field. To evaluate its performance, we can use a benchmark set consisting of sample emails along with their expected categories. This allows us to calculate key metrics like accuracy and recall, providing insights into how well the function is performing in classifying emails.
+
+```python
+from sklearn.metrics import accuracy_score, recall_score
+
+# Define a test set with mail contents and their expected classifications
+test_set = [
+    {"mail_content": "Hi, I would like to inquire about the pricing for your enterprise solutions.", "expected_class": "Business"},
+    {"mail_content": "Hey, how are you doing? Let's catch up soon!", "expected_class": "Personal"},
+    {"mail_content": "Congratulations! You've won a free gift card. Click here to claim it.", "expected_class": "Spam"},
+    {"mail_content": "I need help with resetting my account password.", "expected_class": "Support"},
+    {"mail_content": "We have a special discount on our products this week. Don't miss out!", "expected_class": "Sales"}
+]
+
+# Collect predictions
+predictions = []
+true_labels = []
+
+for test_case in test_set:
+    mail_content = test_case["mail_content"]
+    expected_class = test_case["expected_class"]
+    true_labels.append(expected_class)
+    
+    # Call the classify_mail function
+    result = classify_mail(mail_content)
+    predictions.append(result["category"])
+
+# Calculate accuracy and recall
+accuracy = accuracy_score(true_labels, predictions)
+recall = recall_score(true_labels, predictions, average="macro")
+
+print(f"Accuracy: {accuracy}")
+print(f"Recall: {recall}")
+```
+We can calculate the accuracy and recall of the classification model using the sklearn library. In this example, one of the emails is misclassified. However, it’s worth noting that the email could reasonably belong to either the Business or Sales category. This highlights a key moment to assess whether the categories are too similar or if the prompting needs refinement to reduce ambiguity.
+
+## 1. Evaluate Text Generation
+
+Typical use cases in this category include writing assistants, where the goal is to enhance text generation for applications such as goal generation in SAP SuccessFactors. Another example are copilot systems, where text is generated to be presented to the user, assisting with tasks or providing suggestions. Additionally, retrieval-augmented generation (RAG) systems are increasingly popular, as they integrate knowledge bases with LLMs to produce more context-aware and informative outputs.
+
+This paradigm evaluates the quality of free-form, unstructured text generation, such as paragraphs, dialogues, or creative writing. The primary goals are to assess whether the generated text is coherent, contextually relevant, factually accurate, and stylistically appropriate.
 
 Key Considerations and Metrics:
-
 Reference-Based vs. Reference-Free Metrics:
 
-Reference-Based: Traditional metrics such as BLEU, ROUGE, and BERTScore measure n-gram overlap or semantic similarity with human-written references. These approaches are effective for well-defined tasks (e.g., translation or summarization) but may not capture creativity or nuance. E.g. given a generated Text "The Eifeltower is located in London" it is compared to a expected value "The Eifeltower is located in Paris". Metrics like BLEU now calculcate the textual overlap between to two word sequences. But be aware - these metrics sometimes focus on superficial patterns rather than deep semantics. Plus it requires us to actually have pre-written best case examples for any given input prompt. Usually something that is costly to construct.
+Reference-Based Metrics:
+Traditional metrics like BLEU, ROUGE, and BERTScore measure n-gram overlap or semantic similarity with human-written references. These approaches work well for well-defined tasks such as translation or summarization, but may not fully capture the creativity or nuance of the generated text.
+For instance, if the LLM generates "The Eiffel Tower is located in London," and the expected reference is "The Eiffel Tower is located in Paris," metrics like BLEU will calculate the textual overlap between the two sequences and it will be quite a high result - because the sentence is very similar. However, it's important to note that these metrics sometimes focus more on superficial patterns than on deeper semantic meaning. Additionally, this approach requires having pre-written "ideal" examples, which can be costly and time-consuming to construct.
 
-Reference-Free / LLM-as-a-Judge: Emerging approaches leverage other LLMs to act as evaluators (or “judges”) using chain-of-thought (CoT) prompting, as seen in methods like G-Eval. These frameworks can assess quality dimensions like coherence, factuality, and relevancy by comparing outputs to human-like evaluation criteria. Essentially we instruct a seperate LLM to judge a generated text towards our own defined metrics. The beauty of this approach is that we are able to miimic a humans decision and taste by baking that into the prompting. The goal is to have a good enough overlap between an experts judgement and the LLM'Judges. Aligning LLM evaluators with human preferences requires careful prompt design and possibly iterative tuning based on a small eval dataset.
+Reference-Free / LLM-as-a-Judge:
+Emerging techniques leverage other LLMs to act as evaluators (or “judges”) of the generated text using chain-of-thought (CoT) prompting, as seen in methods like G-Eval. This allows LLMs to assess key quality dimensions such as coherence, factual accuracy, and relevance by comparing outputs to human-like evaluation criteria. In this approach, a separate LLM is instructed to judge the generated text based on defined metrics. The advantage here is that we can replicate human decision-making and preferences by embedding them into the prompting process. Aligning LLM evaluators with human judgment, however, requires careful prompt design and may involve iterative tuning based on a small evaluation dataset.
 
-Lets have a look at the ROUGE metric example:
+Example: ROUGE Metric Evaluation
 
-Given a set of questions - we now evaluate the generated answer from the LLM'system with the ground truth. 
+To illustrate this, let’s consider a scenario where a set of questions is posed to an LLM, and the generated answers are compared against the ground truth. The ROUGE metric is often used here to measure the quality of the generated response by comparing it to the reference answers, providing insight into how well the model is performing in terms of recall, precision, and overlap with human-provided answers.
 
 ```python
 from rouge_score import rouge_scorer
@@ -63,14 +151,18 @@ scores1 = scorer.score(reference_answers[0], generated_answers[0])
 print("Example 1 ROUGE:", scores1)
 ```
 
-For this purpose we use the rouge_score library and calculate different Rouge values - ROUGE-1 and ROUGE-L. Explaination of 1 and l 
-Then we print out the result. Thats already it for the first example. We can use this and wrap it in an eval loop and we are good.
+Using the rouge_score library, we calculate several ROUGE metrics, focusing on ROUGE-1 and ROUGE-L.
 
+ROUGE-1 measures the overlap of unigrams (single words) between the generated text and the reference. It’s a basic evaluation metric for capturing lexical similarity.
 
+ROUGE-L looks at the longest common subsequence between the generated text and the reference, which helps assess the fluency and coherence of the generated content.
+
+You can see that the ROUGE scores are quite high for example 3 - the sentence structure is very much similar - just the actual fact - the country name is different.
+This showcases the big limitation of n-gram based metrics. They cannot really judge the semantic meaning of the sentence - but just compare the available character sequences.
 
 Next, let's see how it is done with LLM-as-a-Judge:
 
-Again, we start with the same answers - but this time we do not use reference answers - but base our evaluation on the LLM.
+Now, let's explore how the evaluation works with LLM-as-a-Judge. This time, we won’t use reference answers. Instead, we base our evaluation on an LLM itself. The idea is to ask a separate LLM to evaluate the generated text based on predefined quality criteria, such as coherence, factual accuracy, and relevance.
 
 ```python
 generated_answers = [
@@ -115,185 +207,24 @@ print(f"Evaluation Score: {eval_score}%")
 
 ```
 
-Using a LLM call fiven a structured schema - we can obtain a score of the correctness. 
-We could also use the LLM-as-a-judge pattern to compare multiple versions of our LLM-system by having it pick the better answer.
+By using an LLM with a structured schema, we can assess the correctness of the generated text. Additionally, the LLM-as-a-Judge pattern allows us to compare multiple versions of our LLM system, enabling the model to select the best response.
 
-So we can tell there is a broad variety of fine-granular metric evaluation possible with this approach. Always of course having the limitations given by the technology in mind.
+This approach provides a wide range of fine-grained metric evaluations. However, you might wonder: If the LLM generated the response in the first place and perhaps did so incorrectly, in poor form, or with irrelevant content, why would the judge LLM perform better?
 
+Interestingly, there is scientific evidence suggesting that LLMs actually perform better when tasked with evaluating responses than when generating them initially. There’s an intuitive explanation for this: Just as humans often find it easier to judge whether something is well-written than to write it themselves, LLMs can more effectively assess quality than generate perfect responses.
 
-## 2. Evaluate Structured Outputs
-
-Embedded functionalities: Use-cases involving mainly structured outputs
-
-These use-cases often times reduce the entropy of the data - for example using an LLM prompt to classify an email - generate a Graph based on a Prompt etc.
-
-This is the most simple pattern to evaluate here. You can collect a set of examples - for example 30 emails - and hand-lable them with the expected classes. Similar to classical classification algorithms, you can now calculate metrics like accuracy and recall. Whenever possible this is a great way to put a numeric metric as a indicator of performance.
-
-Given categorical values - like the mail class - you can go for an exact match eval to get the total accuracy over the benchmark set.
-For numeric outputs you can use the classical deviation metrics like mean square error as a metric.
-In the case of a structured output you can also have rule-based evaluators - that for example check the adherence to the format expected. e.g. is it parseable JSON? Yes or No.
-
-Lets have a look at the mail classification exapmle:
+In practice, using an LLM as a judge enables us to scale the evaluation of generated text without relying on manual human annotation.
 
 
-```python
-def classify_mail(mail_content):
-    """ Classifies an email into predefined categories using a language model. """
-    # Pseudo code for LLM-based classification
-    categories = ["Business", "Personal", "Spam", "Support", "Sales"]
-    prompt = f"""
-    You are an email classification assistant. 
-    Classify the following email into one or more of the following categories: {categories}.
-    Email content: 
-    {mail_content}
-    """ 
+## 3. Evaluate Tool Use
 
-    # Define the JSON schema for the structured output
-    schema = {
-        "type": "object",
-        "properties": {
-            "category": {
-                "type": "string",
-                "enum": ["Business", "Personal", "Spam", "Support", "Sales"]
-            }
-        },
-        "required": ["category"]
-    }
+Use cases in this category involve agentic behavior, where agents interact with multiple tools to complete tasks. These can range from automated planning scenarios, where the agent must plan and execute a series of actions, to tool interaction, where the agent presents structured outputs, takes actions, or even interacts with users in a conversational manner. The most critical aspect of these use cases is the trajectory the agent takes. For example, in a task like booking a trip, the agent needs to logically follow a series of steps, such as searching for flights, selecting dates, and confirming details. Evaluating such tasks involves assessing both the trajectory and the resulting state of the environment.
 
-    # Validate the output against the schema
-    result = llm(prompt, variables={"categories": categories, "mail_content": mail_content}, json_schema=schema)  # returning structured output
+In agentic behavior, an agent produces a trace of ordered tool calls, where each call includes a specific tool name and its corresponding arguments — typically structured as JSON. This trace outlines the sequence of steps the agent takes to complete a given task.
 
-    return result
+Let’s take a simple example: imagine an agent is asked to book a flight to Paris on May 1st, 2025. The agent will process this request and generate a series of tool calls as it works toward fulfilling the task.
 
-# Example usage
-email = "Hi, I would like to inquire about the pricing for your enterprise solutions."
-classification_result = classify_mail(email)
-print(classification_result)
-```
-Our classify_mail content produces a structured output with the category field.
-We can then use a benchmarking set consisting of some sample mails and their expected class to evaluate the accuracy and recall.
-
-```python
-from sklearn.metrics import accuracy_score, recall_score
-
-# Define a test set with mail contents and their expected classifications
-test_set = [
-    {"mail_content": "Hi, I would like to inquire about the pricing for your enterprise solutions.", "expected_class": "Business"},
-    {"mail_content": "Hey, how are you doing? Let's catch up soon!", "expected_class": "Personal"},
-    {"mail_content": "Congratulations! You've won a free gift card. Click here to claim it.", "expected_class": "Spam"},
-    {"mail_content": "I need help with resetting my account password.", "expected_class": "Support"},
-    {"mail_content": "We have a special discount on our products this week. Don't miss out!", "expected_class": "Sales"}
-]
-
-# Collect predictions
-predictions = []
-true_labels = []
-
-for test_case in test_set:
-    mail_content = test_case["mail_content"]
-    expected_class = test_case["expected_class"]
-    true_labels.append(expected_class)
-    
-    # Call the classify_mail function
-    result = classify_mail(mail_content)
-    predictions.append(result["category"])
-
-# Calculate accuracy and recall
-accuracy = accuracy_score(true_labels, predictions)
-recall = recall_score(true_labels, predictions, average="macro")
-
-print(f"Accuracy: {accuracy}")
-print(f"Recall: {recall}")
-```
-We can calculate the accuracy and recall of the classification model using the sklearn library.
-In this example one of them is missclassified. But to be fair - it could apply to both categories - Business and Sales.
-That would be a good time to investigate if the categories are too similar to each other or if we have to refine the prompting.
-
-
-
-## 3. Evaluate actions taken
-
-Agentic behavior: Use-cases involving interaction with tools
-
-These cases essentially require a agent to do planning, use multiple tools and either just take actions, present structured output in a app or even interact with the user in text form.
-In this case the most critical aspect is the trajectory the agent takes. Given a query to book a trip, you want your agents to come to the conclusion to take xyz steps. 
-We can validate the trajectory or the resulting state of the environment to do so.
-
-Let's have a look at some sample on how this could look like:
-
-The agentic behaviour results in a trace of ordered tool_calls - having a tool_name and some tool arguments. They can be of any type - often times JSON.
-In our case we have a Agent capable of using multiple tools to book a flight. 
-
-We provide the agent the following tools:
-
-```python
-agent_tools = [
-    {
-        "name": "search_flight",
-        "description": "Searches for available flights based on destination and date.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "destination": {
-                    "type": "string",
-                    "description": "The destination city for the flight."
-                },
-                "date": {
-                    "type": "string",
-                    "description": "The date of the flight in YYYY-MM-DD format."
-                }
-            },
-            "required": ["destination", "date"]
-        }
-    },
-    {
-        "name": "select_flight",
-        "description": "Selects a specific flight from the search results.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "flight_id": {
-                    "type": "string",
-                    "description": "The unique identifier of the flight to be selected."
-                }
-            },
-            "required": ["flight_id"]
-        }
-    },
-    {
-        "name": "book_flight",
-        "description": "Books the selected flight.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "flight_id": {
-                    "type": "string",
-                    "description": "The unique identifier of the flight to be booked."
-                }
-            },
-            "required": ["flight_id"]
-        }
-    },
-    {
-        "name": "lookup_weather",
-        "description": "Retrieves the weather forecast for a specific location.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "location": {
-                    "type": "string",
-                    "description": "The name of the city or location to get the weather forecast for."
-                }
-            },
-            "required": ["location"]
-        }
-    }
-]
-```
-
-Now looking at an example - we have a request from a user to book a flight at the 1st of May 2025 to Paris. Resulting in a trace of tool calls.
-For our use-case and the response quality it is very important that the agent uses these tools in the correct order and with the input specified by the user.
-We now compare the actual actions taken - and its sequence to the expected trace.
+For use cases like this, the quality of the response heavily depends on the agent using the correct tools in the correct order, while accurately passing along the input provided by the user. To evaluate this, we can compare the actual tool call sequence produced by the agent against a predefined expected trace — ensuring both the order and the arguments match the intended plan.
 
 ```python
 # Example: Define an expected trace and actual trace using dictionaries
@@ -334,10 +265,9 @@ def evaluate_trace(actual_trace: list, expected_trace: list) -> bool:
 is_valid = evaluate_trace(actual_trace, expected_trace)
 print("Trace is valid:", is_valid)
 ```
+We can now check whether the actions taken by the LLM are correct or not. In this particular example, the agent’s response is incorrect — it used the wrong tool and provided the wrong input.
 
-We can check if the actions taken by the LLM are correct or not. In this case the prepared example is not correct - the LLM used a wrong tool and wrong input for the tool.
-This is a simple example - but in practice we can use this to evaluate the LLM's performance and correctness of the actions taken.
-Scaling the number of example prompts and expected traces allows us to evaluate the LLM's performance in a more robust way.
+While this is a simple case, the same approach can be applied in practice to systematically evaluate the LLM’s decision-making and the correctness of the actions it takes. By scaling the number of example prompts and expected traces, we can build a more robust and reliable benchmark for assessing the agent’s performance across different scenarios.
 
 ### Using evals to improve performance
 When speaking with developers, we often encounter concerns about the performance of custom LLM applications. While some individual prompts may work well, they often fail to address the breadth of use cases users present. To tackle this, you can adopt a continuous improvement cycle using the following general schema:

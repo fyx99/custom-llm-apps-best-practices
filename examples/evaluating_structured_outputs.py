@@ -9,8 +9,7 @@ def classify_mail(mail_content):
 You are an email classification assistant. 
 Classify the following email into one or more of the following categories: {{?categories}}.
 Email content: 
-{{?mail_content}}
-    """ 
+{{?mail_content}}""" 
 
     # Define the JSON schema for the structured output
     schema = {
@@ -30,14 +29,12 @@ Email content:
     return result
 
 # Example usage
-if __name__ == "__main__":
-    email = "Hi, I would like to inquire about the pricing for your enterprise solutions."
-    classification_result = classify_mail(email)
-    print(classification_result)
+email = "Hi, I would like to inquire about the pricing for your enterprise solutions."
+classification_result = classify_mail(email)
+print(classification_result)
     
     
-    
-    
+# Evaluating the classification model
 from sklearn.metrics import accuracy_score, recall_score
 from sklearn.metrics import precision_recall_fscore_support
 
