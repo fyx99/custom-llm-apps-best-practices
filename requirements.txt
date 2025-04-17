@@ -1,0 +1,6 @@
+flask
+requests
+uvicorn
+generative-ai-hub-sdk
+scikit-learn
+rouge-score
